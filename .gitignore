@@ -1,0 +1,16 @@
+build/
+build-*/
+out/
+
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+*.user
+
+config/local_config.json
+*.log
+*.db
+*.sqlite
+*.sqlite3
