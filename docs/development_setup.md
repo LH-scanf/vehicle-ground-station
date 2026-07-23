@@ -32,6 +32,8 @@ ctest --test-dir build --output-on-failure
 
 应用支持 `--smoke-test` 参数。该模式会加载 QML 主界面并自动退出，适合验证资源和 QML 是否能够正常初始化。
 
+设置页面保存的本机覆盖文件位于可执行文件旁的 `config/local_config.json`。该文件不会提交到 Git。
+
 ## 当前已验证环境
 
 首个基础切片使用 Qt 6.9.0 MinGW 64-bit Kit 完成了本地验证。不同电脑可使用兼容的 Qt 6 Kit，无需保持相同安装路径。

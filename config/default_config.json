@@ -1,0 +1,9 @@
+{
+  "connection": {
+    "vehicle_ip": "192.168.1.10",
+    "vehicle_port": 8765,
+    "vehicle_id": "car_01",
+    "auto_connect": false,
+    "auto_reconnect": true
+  }
+}

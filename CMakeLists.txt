@@ -13,8 +13,16 @@ qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(vehicle_ground_station
     src/main.cpp
+    src/config/ConfigManager.cpp
+    src/config/ConfigManager.h
     src/vehicle/VehicleState.cpp
     src/vehicle/VehicleState.h
+)
+
+qt_add_resources(vehicle_ground_station "configuration"
+    PREFIX "/"
+    FILES
+        config/default_config.json
 )
 
 qt_add_qml_module(vehicle_ground_station
