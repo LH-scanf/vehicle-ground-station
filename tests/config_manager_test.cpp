@@ -23,7 +23,7 @@ void ConfigManagerTest::loadsDefaultsAndLocalOverrides()
     QVERIFY(directory.isValid());
     const QString defaults = directory.filePath(QStringLiteral("defaults.json"));
     const QString local = directory.filePath(QStringLiteral("local.json"));
-    writeFile(defaults, R"({"connection":{"vehicle_ip":"192.168.1.10","vehicle_port":8765,"vehicle_id":"car_01","auto_connect":false,"auto_reconnect":true}})");
+    writeFile(defaults, R"({"connection":{"vehicle_ip":"192.168.1.10","vehicle_port":8765,"vehicle_id":"car_01","auto_connect":false,"auto_reconnect":true},"logging":{"directory":"logs","retention_days":30,"minimum_level":"info","max_display_entries":1000}})");
     writeFile(local, R"({"connection":{"vehicle_ip":"10.0.0.8","vehicle_port":9000,"auto_connect":true}})");
 
     ConfigManager manager;
@@ -33,6 +33,8 @@ void ConfigManagerTest::loadsDefaultsAndLocalOverrides()
     QCOMPARE(manager.vehicleId(), QStringLiteral("car_01"));
     QVERIFY(manager.autoConnect());
     QVERIFY(manager.autoReconnect());
+    QCOMPARE(manager.logDirectory(), QStringLiteral("logs"));
+    QCOMPARE(manager.logRetentionDays(), 30);
     QVERIFY(manager.errorMessage().isEmpty());
 }
 
@@ -42,7 +44,7 @@ void ConfigManagerTest::ignoresMalformedLocalConfiguration()
     QVERIFY(directory.isValid());
     const QString defaults = directory.filePath(QStringLiteral("defaults.json"));
     const QString local = directory.filePath(QStringLiteral("local.json"));
-    writeFile(defaults, R"({"connection":{"vehicle_ip":"192.168.1.10","vehicle_port":8765,"vehicle_id":"car_01","auto_connect":false,"auto_reconnect":true}})");
+    writeFile(defaults, R"({"connection":{"vehicle_ip":"192.168.1.10","vehicle_port":8765,"vehicle_id":"car_01","auto_connect":false,"auto_reconnect":true},"logging":{"directory":"logs","retention_days":30,"minimum_level":"info","max_display_entries":1000}})");
     writeFile(local, QByteArrayLiteral("{invalid json"));
 
     ConfigManager manager;

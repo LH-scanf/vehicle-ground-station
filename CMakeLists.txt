@@ -15,6 +15,12 @@ qt_add_executable(vehicle_ground_station
     src/main.cpp
     src/config/ConfigManager.cpp
     src/config/ConfigManager.h
+    src/log/LogFilterModel.cpp
+    src/log/LogFilterModel.h
+    src/log/LogManager.cpp
+    src/log/LogManager.h
+    src/log/LogWriter.cpp
+    src/log/LogWriter.h
     src/vehicle/VehicleState.cpp
     src/vehicle/VehicleState.h
 )

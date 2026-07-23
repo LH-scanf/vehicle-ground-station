@@ -5,5 +5,11 @@
     "vehicle_id": "car_01",
     "auto_connect": false,
     "auto_reconnect": true
+  },
+  "logging": {
+    "directory": "logs",
+    "retention_days": 30,
+    "minimum_level": "info",
+    "max_display_entries": 1000
   }
 }

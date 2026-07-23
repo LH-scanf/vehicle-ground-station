@@ -34,6 +34,8 @@ ctest --test-dir build --output-on-failure
 
 设置页面保存的本机覆盖文件位于可执行文件旁的 `config/local_config.json`。该文件不会提交到 Git。
 
+运行日志默认位于可执行文件旁的 `logs/`，按日期保存为 UTF-8 JSON Lines。目录和保留策略可以通过本地配置覆盖，日志文件不会提交到 Git。
+
 ## 当前已验证环境
 
 首个基础切片使用 Qt 6.9.0 MinGW 64-bit Kit 完成了本地验证。不同电脑可使用兼容的 Qt 6 Kit，无需保持相同安装路径。
