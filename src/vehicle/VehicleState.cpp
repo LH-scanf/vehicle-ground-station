@@ -2,6 +2,12 @@
 
 #include <QtGlobal>
 
+#include <cmath>
+
+namespace {
+constexpr double RadiansToDegrees = 180.0 / 3.14159265358979323846;
+}
+
 VehicleState::VehicleState(QObject *parent)
     : QObject(parent)
 {
@@ -12,6 +18,15 @@ QString VehicleState::mode() const { return m_mode; }
 double VehicleState::x() const { return m_x; }
 double VehicleState::y() const { return m_y; }
 double VehicleState::yaw() const { return m_yaw; }
+double VehicleState::headingDegrees() const
+{
+    // ROS yaw is counter-clockwise radians. Normalize only for operator display;
+    // the authoritative protocol value remains m_yaw in radians.
+    double degrees = std::fmod(m_yaw * RadiansToDegrees, 360.0);
+    if (degrees < 0.0)
+        degrees += 360.0;
+    return degrees;
+}
 double VehicleState::speed() const { return m_speed; }
 int VehicleState::batteryPercentage() const { return m_batteryPercentage; }
 QString VehicleState::gpsStatus() const { return m_gpsStatus; }
@@ -19,6 +34,7 @@ bool VehicleState::emergencyStopActive() const { return m_emergencyStopActive; }
 bool VehicleState::rcLink() const { return m_rcLink; }
 bool VehicleState::communicationTimeout() const { return m_communicationTimeout; }
 int VehicleState::errorCode() const { return m_errorCode; }
+qint64 VehicleState::lastUpdateTimestamp() const { return m_lastUpdateTimestamp; }
 
 void VehicleState::setConnected(bool connected)
 {
@@ -116,4 +132,13 @@ void VehicleState::setErrorCode(int code)
         return;
     m_errorCode = code;
     emit errorCodeChanged();
+}
+
+void VehicleState::setLastUpdateTimestamp(qint64 timestamp)
+{
+    timestamp = qMax<qint64>(0, timestamp);
+    if (m_lastUpdateTimestamp == timestamp)
+        return;
+    m_lastUpdateTimestamp = timestamp;
+    emit lastUpdateTimestampChanged();
 }

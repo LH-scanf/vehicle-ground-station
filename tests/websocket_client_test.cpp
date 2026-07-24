@@ -123,6 +123,9 @@ void WebSocketClientTest::receivesReadyHeartbeatAndTelemetry()
     QCOMPARE(vehicleState.gpsStatus(), QStringLiteral("RTK Fixed"));
     QVERIFY(qAbs(vehicleState.x() - 2.35) < 0.0001);
     QVERIFY(qAbs(vehicleState.yaw() - 0.52) < 0.0001);
+    QVERIFY(qAbs(vehicleState.headingDegrees() - 29.7938) < 0.001);
+    QVERIFY(vehicleState.rcLink());
+    QVERIFY(vehicleState.lastUpdateTimestamp() > 0);
 
     client.disconnectFromGateway();
     QTRY_VERIFY_WITH_TIMEOUT(!client.socketConnected(), 2000);

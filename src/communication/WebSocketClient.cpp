@@ -358,6 +358,9 @@ void WebSocketClient::handleVehicleStatus(const ProtocolMessage &message)
     m_vehicleState->setEmergencyStopActive(data.value(QStringLiteral("estop_active")).toBool());
     m_vehicleState->setCommunicationTimeout(data.value(QStringLiteral("comm_timeout")).toBool());
     m_vehicleState->setErrorCode(data.value(QStringLiteral("error_code")).toInt());
+    // Use local receipt time for freshness display so clock skew between Windows and
+    // the vehicle computer cannot make a fresh telemetry sample look old or future-dated.
+    m_vehicleState->setLastUpdateTimestamp(QDateTime::currentMSecsSinceEpoch());
     m_vehicleState->setConnected(true);
     m_lastTelemetryTimer.restart();
     m_telemetryStaleLogged = false;

@@ -11,6 +11,7 @@ class VehicleState final : public QObject
     Q_PROPERTY(double x READ x WRITE setX NOTIFY positionChanged)
     Q_PROPERTY(double y READ y WRITE setY NOTIFY positionChanged)
     Q_PROPERTY(double yaw READ yaw WRITE setYaw NOTIFY yawChanged)
+    Q_PROPERTY(double headingDegrees READ headingDegrees NOTIFY yawChanged)
     Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
     Q_PROPERTY(int batteryPercentage READ batteryPercentage WRITE setBatteryPercentage NOTIFY batteryPercentageChanged)
     Q_PROPERTY(QString gpsStatus READ gpsStatus WRITE setGpsStatus NOTIFY gpsStatusChanged)
@@ -18,6 +19,7 @@ class VehicleState final : public QObject
     Q_PROPERTY(bool rcLink READ rcLink WRITE setRcLink NOTIFY rcLinkChanged)
     Q_PROPERTY(bool communicationTimeout READ communicationTimeout WRITE setCommunicationTimeout NOTIFY communicationTimeoutChanged)
     Q_PROPERTY(int errorCode READ errorCode WRITE setErrorCode NOTIFY errorCodeChanged)
+    Q_PROPERTY(qint64 lastUpdateTimestamp READ lastUpdateTimestamp WRITE setLastUpdateTimestamp NOTIFY lastUpdateTimestampChanged)
 
 public:
     explicit VehicleState(QObject *parent = nullptr);
@@ -27,6 +29,7 @@ public:
     [[nodiscard]] double x() const;
     [[nodiscard]] double y() const;
     [[nodiscard]] double yaw() const;
+    [[nodiscard]] double headingDegrees() const;
     [[nodiscard]] double speed() const;
     [[nodiscard]] int batteryPercentage() const;
     [[nodiscard]] QString gpsStatus() const;
@@ -34,6 +37,7 @@ public:
     [[nodiscard]] bool rcLink() const;
     [[nodiscard]] bool communicationTimeout() const;
     [[nodiscard]] int errorCode() const;
+    [[nodiscard]] qint64 lastUpdateTimestamp() const;
 
 public slots:
     void setConnected(bool connected);
@@ -48,6 +52,7 @@ public slots:
     void setRcLink(bool available);
     void setCommunicationTimeout(bool timedOut);
     void setErrorCode(int code);
+    void setLastUpdateTimestamp(qint64 timestamp);
 
 signals:
     void connectedChanged();
@@ -61,6 +66,7 @@ signals:
     void rcLinkChanged();
     void communicationTimeoutChanged();
     void errorCodeChanged();
+    void lastUpdateTimestampChanged();
 
 private:
     bool m_connected = false;
@@ -75,4 +81,5 @@ private:
     bool m_rcLink = false;
     bool m_communicationTimeout = false;
     int m_errorCode = 0;
+    qint64 m_lastUpdateTimestamp = 0;
 };

@@ -10,6 +10,7 @@ class VehicleStateTest final : public QObject
 private slots:
     void startsInConservativeOfflineState();
     void updatesPropertiesAndEmitsSignals();
+    void convertsYawToDisplayHeading();
     void clampsBatteryPercentage();
 };
 
@@ -25,6 +26,7 @@ void VehicleStateTest::startsInConservativeOfflineState()
     QVERIFY(!state.emergencyStopActive());
     QVERIFY(!state.communicationTimeout());
     QCOMPARE(state.errorCode(), 0);
+    QCOMPARE(state.lastUpdateTimestamp(), 0);
 }
 
 void VehicleStateTest::updatesPropertiesAndEmitsSignals()
@@ -38,6 +40,17 @@ void VehicleStateTest::updatesPropertiesAndEmitsSignals()
     QCOMPARE(speedSpy.count(), 1);
     state.setSpeed(1.25);
     QCOMPARE(speedSpy.count(), 1);
+}
+
+void VehicleStateTest::convertsYawToDisplayHeading()
+{
+    VehicleState state;
+
+    state.setYaw(-3.14159265358979323846 / 2.0);
+    QVERIFY(qAbs(state.headingDegrees() - 270.0) < 0.0001);
+
+    state.setYaw(5.0 * 3.14159265358979323846 / 2.0);
+    QVERIFY(qAbs(state.headingDegrees() - 90.0) < 0.0001);
 }
 
 void VehicleStateTest::clampsBatteryPercentage()

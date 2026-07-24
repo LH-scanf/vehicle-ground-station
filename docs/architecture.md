@@ -24,7 +24,7 @@ ROS2
 
 ### VehicleState
 
-`src/vehicle/VehicleState` 是当前车辆状态的 C++ 表示，通过 `Q_PROPERTY`、通知信号和槽暴露给 QML。现阶段数据由模拟定时器更新；通信模块完成后，模拟数据源将替换为经过验证的协议消息，而 QML 属性接口保持稳定。
+`src/vehicle/VehicleState` 是当前车辆状态的 C++ 表示，通过 `Q_PROPERTY`、通知信号和槽暴露给 QML。其数据只由通过协议校验的`vehicle_status`更新；开发联调模拟器位于ROS仓库并发布正常ROS Topic，不在Windows应用内伪造车辆状态。
 
 ### ConfigManager
 
