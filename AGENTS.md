@@ -16,6 +16,21 @@ The Windows application itself must not directly depend on ROS2.
 
 Read the relevant documents under `docs/` before making architectural, protocol, or requirement changes.
 
+### Related ROS2 repository
+
+The Linux vehicle code and ROS2 integration live in the separate repository:
+
+```text
+https://github.com/LH-scanf/ros-car.git
+```
+
+- Treat its `main` branch as the current ROS2 Humble baseline and its `jazzy` branch as the ROS2 Jazzy baseline.
+- Develop and integrate shared gateway behavior against Humble first while that test environment is available, then merge the same distro-neutral gateway changes into `jazzy` and verify compatibility there.
+- Implement the ROS2-facing `vehicle_gateway` in that repository, not in this Windows Qt repository.
+- Keep this repository limited to the WebSocket client, protocol validation, application state, and operator interface.
+- Before changing a ROS2 topic, message type, service, action, or safety behavior, inspect the corresponding implementation in `ros-car` and keep `docs/protocol.md` synchronized.
+- Do not copy ROS2 packages or Python ROS2 nodes into this repository.
+
 ------
 
 ## Project goals
