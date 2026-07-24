@@ -13,7 +13,9 @@ Item {
         StatusCard {
             Layout.fillWidth: true
             title: "连接状态"
-            value: vehicleState.connected ? "在线" : "离线"
+            value: vehicleState.connected
+                   ? "在线"
+                   : (webSocketClient.socketConnected ? "等待遥测" : "离线")
             accent: vehicleState.connected ? "#2dd4a8" : "#fb7185"
         }
         StatusCard {

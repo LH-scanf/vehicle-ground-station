@@ -34,3 +34,35 @@ target_include_directories(log_manager_test PRIVATE ../src)
 target_link_libraries(log_manager_test PRIVATE Qt6::Test)
 
 add_test(NAME log_manager_test COMMAND log_manager_test)
+
+qt_add_executable(protocol_validator_test
+    protocol_validator_test.cpp
+    ../src/communication/ProtocolValidator.cpp
+    ../src/communication/ProtocolValidator.h
+)
+
+target_include_directories(protocol_validator_test PRIVATE ../src)
+target_link_libraries(protocol_validator_test PRIVATE Qt6::Test)
+
+add_test(NAME protocol_validator_test COMMAND protocol_validator_test)
+
+qt_add_executable(websocket_client_test
+    websocket_client_test.cpp
+    ../src/communication/ProtocolValidator.cpp
+    ../src/communication/ProtocolValidator.h
+    ../src/communication/WebSocketClient.cpp
+    ../src/communication/WebSocketClient.h
+    ../src/config/ConfigManager.cpp
+    ../src/config/ConfigManager.h
+    ../src/log/LogManager.cpp
+    ../src/log/LogManager.h
+    ../src/log/LogWriter.cpp
+    ../src/log/LogWriter.h
+    ../src/vehicle/VehicleState.cpp
+    ../src/vehicle/VehicleState.h
+)
+
+target_include_directories(websocket_client_test PRIVATE ../src)
+target_link_libraries(websocket_client_test PRIVATE Qt6::Test Qt6::WebSockets)
+
+add_test(NAME websocket_client_test COMMAND websocket_client_test)

@@ -8,42 +8,71 @@ class VehicleState final : public QObject
     Q_OBJECT
     Q_PROPERTY(bool connected READ connected WRITE setConnected NOTIFY connectedChanged)
     Q_PROPERTY(QString mode READ mode WRITE setMode NOTIFY modeChanged)
+    Q_PROPERTY(double x READ x WRITE setX NOTIFY positionChanged)
+    Q_PROPERTY(double y READ y WRITE setY NOTIFY positionChanged)
+    Q_PROPERTY(double yaw READ yaw WRITE setYaw NOTIFY yawChanged)
     Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
     Q_PROPERTY(int batteryPercentage READ batteryPercentage WRITE setBatteryPercentage NOTIFY batteryPercentageChanged)
     Q_PROPERTY(QString gpsStatus READ gpsStatus WRITE setGpsStatus NOTIFY gpsStatusChanged)
     Q_PROPERTY(bool emergencyStopActive READ emergencyStopActive WRITE setEmergencyStopActive NOTIFY emergencyStopActiveChanged)
+    Q_PROPERTY(bool rcLink READ rcLink WRITE setRcLink NOTIFY rcLinkChanged)
+    Q_PROPERTY(bool communicationTimeout READ communicationTimeout WRITE setCommunicationTimeout NOTIFY communicationTimeoutChanged)
+    Q_PROPERTY(int errorCode READ errorCode WRITE setErrorCode NOTIFY errorCodeChanged)
 
 public:
     explicit VehicleState(QObject *parent = nullptr);
 
     [[nodiscard]] bool connected() const;
     [[nodiscard]] QString mode() const;
+    [[nodiscard]] double x() const;
+    [[nodiscard]] double y() const;
+    [[nodiscard]] double yaw() const;
     [[nodiscard]] double speed() const;
     [[nodiscard]] int batteryPercentage() const;
     [[nodiscard]] QString gpsStatus() const;
     [[nodiscard]] bool emergencyStopActive() const;
+    [[nodiscard]] bool rcLink() const;
+    [[nodiscard]] bool communicationTimeout() const;
+    [[nodiscard]] int errorCode() const;
 
 public slots:
     void setConnected(bool connected);
     void setMode(const QString &mode);
+    void setX(double x);
+    void setY(double y);
+    void setYaw(double yaw);
     void setSpeed(double speed);
     void setBatteryPercentage(int percentage);
     void setGpsStatus(const QString &status);
     void setEmergencyStopActive(bool active);
+    void setRcLink(bool available);
+    void setCommunicationTimeout(bool timedOut);
+    void setErrorCode(int code);
 
 signals:
     void connectedChanged();
     void modeChanged();
+    void positionChanged();
+    void yawChanged();
     void speedChanged();
     void batteryPercentageChanged();
     void gpsStatusChanged();
     void emergencyStopActiveChanged();
+    void rcLinkChanged();
+    void communicationTimeoutChanged();
+    void errorCodeChanged();
 
 private:
-    bool m_connected = true;
-    QString m_mode = QStringLiteral("auto");
-    double m_speed = 0.8;
-    int m_batteryPercentage = 82;
-    QString m_gpsStatus = QStringLiteral("RTK Fixed");
+    bool m_connected = false;
+    QString m_mode = QStringLiteral("unknown");
+    double m_x = 0.0;
+    double m_y = 0.0;
+    double m_yaw = 0.0;
+    double m_speed = 0.0;
+    int m_batteryPercentage = 0;
+    QString m_gpsStatus = QStringLiteral("未知");
     bool m_emergencyStopActive = false;
+    bool m_rcLink = false;
+    bool m_communicationTimeout = false;
+    int m_errorCode = 0;
 };

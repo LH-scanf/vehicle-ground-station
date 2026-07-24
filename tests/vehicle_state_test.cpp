@@ -8,9 +8,24 @@ class VehicleStateTest final : public QObject
     Q_OBJECT
 
 private slots:
+    void startsInConservativeOfflineState();
     void updatesPropertiesAndEmitsSignals();
     void clampsBatteryPercentage();
 };
+
+void VehicleStateTest::startsInConservativeOfflineState()
+{
+    VehicleState state;
+
+    QVERIFY(!state.connected());
+    QCOMPARE(state.mode(), QStringLiteral("unknown"));
+    QCOMPARE(state.speed(), 0.0);
+    QCOMPARE(state.batteryPercentage(), 0);
+    QVERIFY(!state.rcLink());
+    QVERIFY(!state.emergencyStopActive());
+    QVERIFY(!state.communicationTimeout());
+    QCOMPARE(state.errorCode(), 0);
+}
 
 void VehicleStateTest::updatesPropertiesAndEmitsSignals()
 {

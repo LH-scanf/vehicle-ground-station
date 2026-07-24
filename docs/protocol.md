@@ -53,7 +53,7 @@ Windows 应用不直接依赖 ROS2。ROS2 Topic、Service 和 Action 与本协�
 - 一个帧中不得拼接多个 JSON 对象。
 - V1 不接收二进制帧。
 - JSON 顶层必须是对象，不能是数组、字符串或数字。
-- 单个文本消息建议最大为 256 KiB；最终上限需要在实现任务中确认。
+- 单个UTF-8 JSON文本消息最大为256 KiB；超过上限时接收端关闭WebSocket会话。
 - 超过实现上限时，接收端应记录错误并使用 WebSocket 关闭码 `1009` 关闭连接。
 
 ### 2.3 连接和重连
@@ -819,10 +819,9 @@ V1的 `auto_disconnect_policy`固定为 `cancel_task_and_stop`。网关必须在
 以下内容在网络实现前需要确认：
 
 1. WebSocket URL是否需要固定路径，例如 `/ws`。
-2. 单条JSON消息上限是否采用256 KiB。
-3. `steer_norm`负值左转、正值右转是否与车辆实际控制接口一致。
-4. `gps_fix`枚举是否与车辆GPS驱动一致。
-5. 哪些命令需要车辆网关在 `gateway_ready.capabilities` 中声明。
-6. 模式切换、导航和急停各自的最终执行超时时间。
+2. `steer_norm`负值左转、正值右转是否与车辆实际控制接口一致。
+3. `gps_fix`枚举是否与车辆GPS驱动一致。
+4. 哪些命令需要车辆网关在 `gateway_ready.capabilities` 中声明。
+5. 模式切换、导航和急停各自的最终执行超时时间。
 
 在上述事项确认前，本文档保持 Draft 状态。

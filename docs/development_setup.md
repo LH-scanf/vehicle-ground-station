@@ -6,9 +6,7 @@
 - Qt 6.6 或更高的兼容 Qt 6 版本
 - CMake 3.21 或更高版本
 - C++20 编译器
-- Qt 模块：Core、Gui、Qml、Quick、QuickControls2、Test
-
-后续开始通信功能时将增加 Qt WebSockets 模块。
+- Qt 模块：Core、Gui、Qml、Quick、QuickControls2、WebSockets、Test
 
 ## 配置与构建
 

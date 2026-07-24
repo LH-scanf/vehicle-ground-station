@@ -9,7 +9,7 @@ QML 界面
    ↓ Qt 属性、信号和槽
 C++ 应用与状态层
    ↓ 明确的业务接口
-C++ 通信与协议层（后续任务）
+C++ 通信与协议层
    ↓ WebSocket + JSON
 Linux 车辆网关
    ↓
@@ -53,16 +53,33 @@ ROS2
 
 普通日志不保存高频遥测、完整地图、完整路径或敏感信息。需要持续记录原始车辆数据时，应建立独立的数据记录与回放模块。
 
+### ProtocolValidator
+
+`src/communication/ProtocolValidator`实现V1 JSON公共消息结构和当前通信切片所需的`gateway_ready`、`pong`、`vehicle_status`校验。协议校验不依赖QML，也不直接修改车辆状态；只有完整验证通过的遥测才能进入`VehicleState`。
+
+### WebSocketClient
+
+`src/communication/WebSocketClient`在Qt事件循环中异步拥有`QWebSocket`，负责连接、手动断开、3秒自动重连、1秒JSON心跳、3秒心跳超时、网关就绪门控和遥测陈旧检测。该模块不阻塞界面线程。
+
+当前通信切片只处理：
+
+- `event/gateway_ready`
+- `heartbeat/pong`
+- `telemetry/vehicle_status`
+
+尚未实现的`ack`、`alarm`和控制类消息只记录诊断信息，不产生车辆控制副作用。二进制WebSocket消息会按V1规则拒绝。
+
 ## 3. 启动流程
 
 ```text
 QGuiApplication
    → ConfigManager 加载默认值和本地覆盖
    → LogManager 根据配置初始化日志目录和写入线程
-   → 创建 VehicleState
+   → 创建 VehicleState（初始离线）
+   → 创建 WebSocketClient 并绑定配置、日志和车辆状态
    → 将配置、日志模型和车辆状态暴露给 QML
    → 加载 Main.qml
-   → 启动当前模拟数据源
+   → 若本机配置启用auto_connect，则连接车辆网关
 ```
 
 默认配置无法读取时应用仍可启动，但会记录警告并使用编译时安全默认值。本地配置错误不会导致程序退出。
@@ -71,13 +88,14 @@ QGuiApplication
 
 - `src/config/`：配置解析、校验与持久化。
 - `src/log/`：结构化日志、界面日志模型、筛选和后台文件写入。
+- `src/communication/`：WebSocket连接、心跳、协议解析与校验。
 - `src/vehicle/`：权威车辆状态。
 - `qml/`：页面、组件和视觉交互。
 - `config/`：提交到 Git 的共享默认配置。
 - `tests/`：可独立执行的 C++ 行为测试。
 - `docs/tasks/`：每个开发切片的范围和验收条件。
 
-后续通信、协议、地图、任务、控制、告警和日志模块按 `AGENTS.md` 规定加入各自的 C++ 目录，不提前创建空类。
+后续地图、任务、控制和告警模块按 `AGENTS.md` 规定加入各自的C++目录，不提前创建空类。
 
 ## 5. 线程与安全边界
 

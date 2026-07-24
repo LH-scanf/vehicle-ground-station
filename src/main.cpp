@@ -1,3 +1,4 @@
+#include "communication/WebSocketClient.h"
 #include "config/ConfigManager.h"
 #include "log/LogFilterModel.h"
 #include "log/LogManager.h"
@@ -7,10 +8,8 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QTimer>
 #include <QDebug>
-
-#include <cmath>
+#include <QTimer>
 
 int main(int argc, char *argv[])
 {
@@ -96,11 +95,13 @@ int main(int argc, char *argv[])
     });
 
     VehicleState vehicleState;
+    WebSocketClient webSocketClient(&configManager, &vehicleState, &logManager);
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("configManager"), &configManager);
     engine.rootContext()->setContextProperty(QStringLiteral("logManager"), &logManager);
     engine.rootContext()->setContextProperty(QStringLiteral("logFilterModel"), &logFilterModel);
     engine.rootContext()->setContextProperty(QStringLiteral("vehicleState"), &vehicleState);
+    engine.rootContext()->setContextProperty(QStringLiteral("webSocketClient"), &webSocketClient);
 
     QObject::connect(
         &engine,
@@ -111,18 +112,12 @@ int main(int argc, char *argv[])
 
     engine.loadFromModule(QStringLiteral("VehicleGroundStation"), QStringLiteral("Main"));
 
-    if (application.arguments().contains(QStringLiteral("--smoke-test")))
+    const bool smokeTest = application.arguments().contains(QStringLiteral("--smoke-test"));
+    if (smokeTest)
         return engine.rootObjects().isEmpty() ? EXIT_FAILURE : EXIT_SUCCESS;
 
-    QTimer mockTimer;
-    int mockTick = 0;
-    QObject::connect(&mockTimer, &QTimer::timeout, &vehicleState, [&vehicleState, &mockTick] {
-        ++mockTick;
-        vehicleState.setSpeed(0.8 + 0.25 * std::sin(mockTick * 0.35));
-        if (mockTick % 20 == 0)
-            vehicleState.setBatteryPercentage(vehicleState.batteryPercentage() - 1);
-    });
-    mockTimer.start(500);
+    if (configManager.autoConnect())
+        QTimer::singleShot(0, &webSocketClient, &WebSocketClient::connectToGateway);
 
     return application.exec();
 }

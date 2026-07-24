@@ -7,12 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2 Test)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2 Test WebSockets)
 qt_standard_project_setup(REQUIRES 6.6)
 qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(vehicle_ground_station
     src/main.cpp
+    src/communication/ProtocolValidator.cpp
+    src/communication/ProtocolValidator.h
+    src/communication/WebSocketClient.cpp
+    src/communication/WebSocketClient.h
     src/config/ConfigManager.cpp
     src/config/ConfigManager.h
     src/log/LogFilterModel.cpp
@@ -45,7 +49,7 @@ qt_add_qml_module(vehicle_ground_station
 )
 
 target_include_directories(vehicle_ground_station PRIVATE src)
-target_link_libraries(vehicle_ground_station PRIVATE Qt6::Quick Qt6::QuickControls2)
+target_link_libraries(vehicle_ground_station PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::WebSockets)
 
 set_target_properties(vehicle_ground_station PROPERTIES
     WIN32_EXECUTABLE TRUE
