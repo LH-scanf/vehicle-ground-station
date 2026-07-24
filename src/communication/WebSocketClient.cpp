@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkProxy>
 #include <QUrl>
 #include <QWebSocketProtocol>
 
@@ -50,6 +51,10 @@ WebSocketClient::WebSocketClient(ConfigManager *configManager,
     Q_ASSERT(m_vehicleState);
     Q_ASSERT(m_logManager);
 
+    // The vehicle gateway is reached directly on the local network. Explicitly bypass
+    // system/application proxies so PAC, VPN, or stale proxy settings cannot intercept
+    // or reject the ws:// connection before the WebSocket handshake.
+    m_socket.setProxy(QNetworkProxy::NoProxy);
     m_socket.setMaxAllowedIncomingFrameSize(ProtocolValidator::MaximumTextMessageBytes);
     m_socket.setMaxAllowedIncomingMessageSize(ProtocolValidator::MaximumTextMessageBytes);
 
