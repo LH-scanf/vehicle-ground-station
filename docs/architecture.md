@@ -61,13 +61,15 @@ ROS2
 
 `src/communication/WebSocketClient`在Qt事件循环中异步拥有`QWebSocket`，负责连接、手动断开、3秒自动重连、1秒JSON心跳、3秒心跳超时、网关就绪门控和遥测陈旧检测。该模块不阻塞界面线程。
 
-当前通信切片只处理：
+当前通信切片处理：
 
 - `event/gateway_ready`
 - `heartbeat/pong`
 - `telemetry/vehicle_status`
+- `command/set_mode`发送
+- `ack/set_mode`接收及发送、接受、完成、失败、超时和结果未知状态
 
-尚未实现的`ack`、`alarm`和控制类消息只记录诊断信息，不产生车辆控制副作用。二进制WebSocket消息会按V1规则拒绝。
+`WebSocketClient`当前只允许一个模式切换命令处于等待状态。它生成唯一`request_id`，在断线时把未完成命令标记为“结果未知”，并且不会自动重发。收到`completed`也不会直接修改`VehicleState.mode`；实际模式仍只能由经过验证的`vehicle_status`更新。尚未实现的急停、人工控制、导航、任务取消、`alarm`等消息只记录诊断信息，不产生车辆控制副作用。二进制WebSocket消息会按V1规则拒绝。
 
 ## 3. 启动流程
 

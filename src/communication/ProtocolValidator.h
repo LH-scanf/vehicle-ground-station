@@ -42,8 +42,19 @@ public:
     [[nodiscard]] static bool validateVehicleStatus(const ProtocolMessage &message,
                                                     QString &errorCode,
                                                     QString &errorMessage);
+    [[nodiscard]] static bool validateCommandAck(const ProtocolMessage &message,
+                                                 QString &stage,
+                                                 QString &code,
+                                                 QString &ackMessage,
+                                                 QString &errorCode,
+                                                 QString &errorMessage);
 
     [[nodiscard]] static QJsonObject makeHeartbeatPing(const QString &vehicleId,
                                                        quint32 seq,
                                                        qint64 timestamp);
+    [[nodiscard]] static QJsonObject makeSetModeCommand(const QString &vehicleId,
+                                                        quint32 seq,
+                                                        qint64 timestamp,
+                                                        const QString &requestId,
+                                                        const QString &mode);
 };

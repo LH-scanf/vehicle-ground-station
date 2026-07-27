@@ -11,7 +11,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkProxy>
+#include <QSet>
 #include <QUrl>
+#include <QUuid>
 #include <QWebSocketProtocol>
 
 #include <limits>
@@ -62,6 +64,8 @@ WebSocketClient::WebSocketClient(ConfigManager *configManager,
     m_livenessTimer.setInterval(250);
     m_reconnectTimer.setInterval(3000);
     m_reconnectTimer.setSingleShot(true);
+    m_modeCommandTimer.setInterval(3000);
+    m_modeCommandTimer.setSingleShot(true);
 
     connect(&m_socket, &QWebSocket::connected, this, &WebSocketClient::handleConnected);
     connect(&m_socket, &QWebSocket::disconnected, this, &WebSocketClient::handleDisconnected);
@@ -71,6 +75,10 @@ WebSocketClient::WebSocketClient(ConfigManager *configManager,
     connect(&m_heartbeatTimer, &QTimer::timeout, this, &WebSocketClient::sendHeartbeat);
     connect(&m_livenessTimer, &QTimer::timeout, this, &WebSocketClient::checkLiveness);
     connect(&m_reconnectTimer, &QTimer::timeout, this, &WebSocketClient::connectToGateway);
+    connect(&m_modeCommandTimer,
+            &QTimer::timeout,
+            this,
+            &WebSocketClient::handleModeCommandTimeout);
 }
 
 QString WebSocketClient::connectionState() const { return m_connectionState; }
@@ -79,6 +87,61 @@ bool WebSocketClient::gatewayReady() const { return m_gatewayReady; }
 int WebSocketClient::roundTripTimeMs() const { return m_roundTripTimeMs; }
 QString WebSocketClient::lastError() const { return m_lastError; }
 QString WebSocketClient::endpoint() const { return m_endpoint; }
+bool WebSocketClient::modeCommandAvailable() const { return m_modeCommandAvailable; }
+bool WebSocketClient::modeCommandPending() const { return m_modeCommandPending; }
+QString WebSocketClient::requestedMode() const { return m_requestedMode; }
+QString WebSocketClient::modeCommandStage() const { return m_modeCommandStage; }
+QString WebSocketClient::modeCommandMessage() const { return m_modeCommandMessage; }
+
+void WebSocketClient::requestModeChange(const QString &mode)
+{
+    static const QSet<QString> supportedModes = {QStringLiteral("rc"),
+                                                 QStringLiteral("auto"),
+                                                 QStringLiteral("ground")};
+    if (!supportedModes.contains(mode)) {
+        setModeCommandState(QStringLiteral("rejected"), QStringLiteral("不支持的车辆模式"), false);
+        return;
+    }
+    if (!m_socketConnected || !m_gatewayReady || !m_vehicleState->connected()) {
+        setModeCommandState(QStringLiteral("rejected"), QStringLiteral("车辆尚未在线，不能切换模式"), false);
+        return;
+    }
+    if (!m_modeCommandAvailable) {
+        setModeCommandState(QStringLiteral("rejected"), QStringLiteral("当前网关未声明模式切换能力"), false);
+        return;
+    }
+    if (m_modeCommandPending) {
+        setLastError(QStringLiteral("已有模式切换命令正在执行"));
+        return;
+    }
+    if (mode == m_vehicleState->mode()) {
+        setModeCommandState(QStringLiteral("completed"), QStringLiteral("车辆已经处于该模式"), false);
+        return;
+    }
+
+    m_pendingModeRequestId = QStringLiteral("cmd_%1").arg(
+        QUuid::createUuid().toString(QUuid::Id128));
+    m_requestedMode = mode;
+    const QJsonObject command = ProtocolValidator::makeSetModeCommand(
+        m_configManager->vehicleId(),
+        takeNextSequence(),
+        QDateTime::currentMSecsSinceEpoch(),
+        m_pendingModeRequestId,
+        mode);
+    setModeCommandState(QStringLiteral("sent"), QStringLiteral("命令已发送，等待网关接收"), true);
+    m_modeCommandTimer.start();
+    m_socket.sendTextMessage(
+        QString::fromUtf8(QJsonDocument(command).toJson(QJsonDocument::Compact)));
+    m_logManager->addEntry(LogManager::Level::Info,
+                           LogManager::Category::Command,
+                           LogManager::Display::Primary,
+                           QStringLiteral("command_sent"),
+                           QStringLiteral("WebSocketClient"),
+                           QStringLiteral("已发送模式切换命令：%1").arg(mode),
+                           m_configManager->vehicleId(),
+                           m_pendingModeRequestId,
+                           {{QStringLiteral("mode"), mode}});
+}
 
 void WebSocketClient::connectToGateway()
 {
@@ -176,6 +239,8 @@ void WebSocketClient::handleTextMessage(const QString &text)
     } else if (message.type == QStringLiteral("telemetry")
                && message.name == QStringLiteral("vehicle_status")) {
         handleVehicleStatus(message);
+    } else if (message.type == QStringLiteral("ack") && message.name == QStringLiteral("set_mode")) {
+        handleCommandAck(message);
     } else {
         m_logManager->addEntry(LogManager::Level::Debug,
                                LogManager::Category::Communication,
@@ -190,6 +255,22 @@ void WebSocketClient::handleTextMessage(const QString &text)
                                 {QStringLiteral("name"), message.name},
                                 {QStringLiteral("seq"), static_cast<qint64>(message.seq)}});
     }
+}
+
+void WebSocketClient::handleModeCommandTimeout()
+{
+    if (!m_modeCommandPending)
+        return;
+    const QString requestId = m_pendingModeRequestId;
+    finishPendingModeCommand(QStringLiteral("timed_out"), QStringLiteral("等待车辆执行结果超时"));
+    m_logManager->addEntry(LogManager::Level::Error,
+                           LogManager::Category::Command,
+                           LogManager::Display::Primary,
+                           QStringLiteral("command_timed_out"),
+                           QStringLiteral("WebSocketClient"),
+                           QStringLiteral("模式切换命令等待结果超时，不会自动重发"),
+                           m_configManager->vehicleId(),
+                           requestId);
 }
 
 void WebSocketClient::handleSocketError()
@@ -292,6 +373,14 @@ void WebSocketClient::handleGatewayReady(const ProtocolMessage &message)
                                m_configManager->vehicleId());
     }
     m_gatewayInstanceId = newInstanceId;
+    bool supportsSetMode = false;
+    for (const QJsonValue &capability : message.data.value(QStringLiteral("capabilities")).toArray()) {
+        if (capability.toString() == QStringLiteral("set_mode")) {
+            supportsSetMode = true;
+            break;
+        }
+    }
+    setModeCommandAvailable(supportsSetMode);
     setGatewayReady(true);
     setConnectionState(QStringLiteral("waiting_telemetry"));
 
@@ -367,6 +456,55 @@ void WebSocketClient::handleVehicleStatus(const ProtocolMessage &message)
     setConnectionState(QStringLiteral("connected"));
 }
 
+void WebSocketClient::handleCommandAck(const ProtocolMessage &message)
+{
+    QString stage;
+    QString code;
+    QString ackMessage;
+    QString errorCode;
+    QString errorMessage;
+    if (!ProtocolValidator::validateCommandAck(
+            message, stage, code, ackMessage, errorCode, errorMessage)) {
+        logProtocolFailure(errorCode, errorMessage);
+        return;
+    }
+    if (!m_modeCommandPending || message.requestId != m_pendingModeRequestId) {
+        m_logManager->addEntry(LogManager::Level::Warning,
+                               LogManager::Category::Command,
+                               LogManager::Display::Diagnostic,
+                               QStringLiteral("unknown_command_ack"),
+                               QStringLiteral("WebSocketClient"),
+                               QStringLiteral("收到无法匹配当前命令的应答"),
+                               m_configManager->vehicleId(),
+                               message.requestId,
+                               {{QStringLiteral("stage"), stage}});
+        return;
+    }
+
+    const bool finalStage = stage == QStringLiteral("rejected")
+                            || stage == QStringLiteral("completed")
+                            || stage == QStringLiteral("failed");
+    const LogManager::Level level = (stage == QStringLiteral("rejected")
+                                     || stage == QStringLiteral("failed"))
+                                        ? LogManager::Level::Error
+                                        : LogManager::Level::Info;
+    const QString requestId = m_pendingModeRequestId;
+    m_logManager->addEntry(level,
+                           LogManager::Category::Command,
+                           LogManager::Display::Primary,
+                           QStringLiteral("command_%1").arg(stage),
+                           QStringLiteral("WebSocketClient"),
+                           ackMessage,
+                           m_configManager->vehicleId(),
+                           requestId,
+                           {{QStringLiteral("code"), code},
+                            {QStringLiteral("mode"), m_requestedMode}});
+    if (finalStage)
+        finishPendingModeCommand(stage, ackMessage);
+    else
+        setModeCommandState(stage, ackMessage, true);
+}
+
 void WebSocketClient::scheduleReconnect()
 {
     if (!m_configManager->autoReconnect() || m_manualDisconnect || m_reconnectTimer.isActive())
@@ -384,6 +522,19 @@ void WebSocketClient::scheduleReconnect()
 
 void WebSocketClient::resetSessionState()
 {
+    if (m_modeCommandPending) {
+        const QString requestId = m_pendingModeRequestId;
+        finishPendingModeCommand(QStringLiteral("unknown"),
+                                 QStringLiteral("连接已断开，命令最终结果未知；请勿自动重发"));
+        m_logManager->addEntry(LogManager::Level::Warning,
+                               LogManager::Category::Command,
+                               LogManager::Display::Primary,
+                               QStringLiteral("command_result_unknown"),
+                               QStringLiteral("WebSocketClient"),
+                               QStringLiteral("连接断开，模式切换命令最终结果未知且不会自动重发"),
+                               m_configManager->vehicleId(),
+                               requestId);
+    }
     m_heartbeatTimer.stop();
     m_livenessTimer.stop();
     m_pendingPings.clear();
@@ -393,6 +544,7 @@ void WebSocketClient::resetSessionState()
     m_telemetryStaleLogged = false;
     setSocketConnected(false);
     setGatewayReady(false);
+    setModeCommandAvailable(false);
     setRoundTripTimeMs(-1);
     m_vehicleState->setConnected(false);
 }
@@ -443,6 +595,36 @@ void WebSocketClient::setEndpoint(const QString &endpoint)
         return;
     m_endpoint = endpoint;
     emit endpointChanged();
+}
+
+void WebSocketClient::setModeCommandAvailable(bool available)
+{
+    if (m_modeCommandAvailable == available)
+        return;
+    m_modeCommandAvailable = available;
+    emit modeCommandAvailableChanged();
+}
+
+void WebSocketClient::setModeCommandState(const QString &stage,
+                                          const QString &message,
+                                          bool pending)
+{
+    const bool stateChanged = m_modeCommandStage != stage || m_modeCommandMessage != message;
+    const bool pendingChanged = m_modeCommandPending != pending;
+    m_modeCommandStage = stage;
+    m_modeCommandMessage = message;
+    m_modeCommandPending = pending;
+    if (pendingChanged)
+        emit modeCommandPendingChanged();
+    if (stateChanged)
+        emit modeCommandStateChanged();
+}
+
+void WebSocketClient::finishPendingModeCommand(const QString &stage, const QString &message)
+{
+    m_modeCommandTimer.stop();
+    setModeCommandState(stage, message, false);
+    m_pendingModeRequestId.clear();
 }
 
 quint32 WebSocketClient::takeNextSequence()

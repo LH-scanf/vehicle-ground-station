@@ -48,6 +48,7 @@ class ProtocolValidatorTest final : public QObject
 private slots:
     void parsesGatewayReady();
     void buildsHeartbeatPing();
+    void buildsSetModeCommand();
     void validatesMatchingPongShape();
     void validatesVehicleStatus();
     void rejectsInvalidOptionalVehicleStatusFields();
@@ -56,6 +57,8 @@ private slots:
     void rejectsVehicleMismatch();
     void rejectsUnsupportedVersion();
     void rejectsAckWithoutRequestId();
+    void validatesSetModeAckStages();
+    void rejectsInvalidSetModeAckStage();
     void rejectsOversizedMessage();
 };
 
@@ -84,6 +87,21 @@ void ProtocolValidatorTest::buildsHeartbeatPing()
     QCOMPARE(ping.value(QStringLiteral("name")).toString(), QStringLiteral("ping"));
     QCOMPARE(ping.value(QStringLiteral("seq")).toInteger(), 42);
     QVERIFY(ping.value(QStringLiteral("data")).toObject().isEmpty());
+}
+
+void ProtocolValidatorTest::buildsSetModeCommand()
+{
+    const QJsonObject command = ProtocolValidator::makeSetModeCommand(
+        QStringLiteral("car_01"),
+        43,
+        1784651000001LL,
+        QStringLiteral("cmd_test"),
+        QStringLiteral("ground"));
+    QCOMPARE(command.value(QStringLiteral("type")).toString(), QStringLiteral("command"));
+    QCOMPARE(command.value(QStringLiteral("name")).toString(), QStringLiteral("set_mode"));
+    QCOMPARE(command.value(QStringLiteral("request_id")).toString(), QStringLiteral("cmd_test"));
+    QCOMPARE(command.value(QStringLiteral("data")).toObject().value(QStringLiteral("mode")).toString(),
+             QStringLiteral("ground"));
 }
 
 void ProtocolValidatorTest::validatesMatchingPongShape()
@@ -188,6 +206,59 @@ void ProtocolValidatorTest::rejectsAckWithoutRequestId()
          {QStringLiteral("message"), QStringLiteral("accepted")}}));
     QVERIFY(!result.valid);
     QCOMPARE(result.errorCode, QStringLiteral("missing_field"));
+}
+
+void ProtocolValidatorTest::validatesSetModeAckStages()
+{
+    for (const QString &stage : {QStringLiteral("accepted"),
+                                 QStringLiteral("rejected"),
+                                 QStringLiteral("completed"),
+                                 QStringLiteral("failed")}) {
+        QJsonObject object = envelope(
+            QStringLiteral("ack"),
+            QStringLiteral("set_mode"),
+            {{QStringLiteral("stage"), stage},
+             {QStringLiteral("code"), QStringLiteral("ok")},
+             {QStringLiteral("message"), QStringLiteral("test result")}});
+        object.insert(QStringLiteral("request_id"), QStringLiteral("cmd_test"));
+        const ProtocolValidationResult result = parse(object);
+        QVERIFY(result.valid);
+
+        QString parsedStage;
+        QString code;
+        QString ackMessage;
+        QString errorCode;
+        QString errorMessage;
+        QVERIFY(ProtocolValidator::validateCommandAck(result.message,
+                                                      parsedStage,
+                                                      code,
+                                                      ackMessage,
+                                                      errorCode,
+                                                      errorMessage));
+        QCOMPARE(parsedStage, stage);
+    }
+}
+
+void ProtocolValidatorTest::rejectsInvalidSetModeAckStage()
+{
+    QJsonObject object = envelope(
+        QStringLiteral("ack"),
+        QStringLiteral("set_mode"),
+        {{QStringLiteral("stage"), QStringLiteral("done")},
+         {QStringLiteral("code"), QStringLiteral("ok")},
+         {QStringLiteral("message"), QStringLiteral("test result")}});
+    object.insert(QStringLiteral("request_id"), QStringLiteral("cmd_test"));
+    const ProtocolValidationResult result = parse(object);
+    QVERIFY(result.valid);
+
+    QString stage;
+    QString code;
+    QString ackMessage;
+    QString errorCode;
+    QString errorMessage;
+    QVERIFY(!ProtocolValidator::validateCommandAck(
+        result.message, stage, code, ackMessage, errorCode, errorMessage));
+    QCOMPARE(errorCode, QStringLiteral("invalid_field_value"));
 }
 
 void ProtocolValidatorTest::rejectsOversizedMessage()

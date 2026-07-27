@@ -208,6 +208,8 @@ ProtocolValidationResult ProtocolValidator::parseIncoming(const QByteArray &utf8
             || root.value(QStringLiteral("request_id")).toString().isEmpty()) {
             return failure(QStringLiteral("missing_field"), QStringLiteral("ack缺少有效request_id"));
         }
+        if (root.value(QStringLiteral("request_id")).toString().size() > 64)
+            return failure(QStringLiteral("invalid_field_value"), QStringLiteral("ack的request_id超过64字符"));
     }
 
     ProtocolValidationResult result;
@@ -421,6 +423,40 @@ bool ProtocolValidator::validateVehicleStatus(const ProtocolMessage &message,
     return true;
 }
 
+bool ProtocolValidator::validateCommandAck(const ProtocolMessage &message,
+                                           QString &stage,
+                                           QString &code,
+                                           QString &ackMessage,
+                                           QString &errorCode,
+                                           QString &errorMessage)
+{
+    if (message.type != QStringLiteral("ack") || message.name != QStringLiteral("set_mode")) {
+        errorCode = QStringLiteral("unknown_message_name");
+        errorMessage = QStringLiteral("消息不是set_mode命令应答");
+        return false;
+    }
+    if (!requireString(message.data, QStringLiteral("stage"), stage, errorCode, errorMessage)
+        || !requireString(message.data, QStringLiteral("code"), code, errorCode, errorMessage)
+        || !requireString(message.data,
+                          QStringLiteral("message"),
+                          ackMessage,
+                          errorCode,
+                          errorMessage)) {
+        return false;
+    }
+
+    static const QSet<QString> stages = {QStringLiteral("accepted"),
+                                         QStringLiteral("rejected"),
+                                         QStringLiteral("completed"),
+                                         QStringLiteral("failed")};
+    if (!stages.contains(stage)) {
+        errorCode = QStringLiteral("invalid_field_value");
+        errorMessage = QStringLiteral("data.stage不是受支持的命令阶段");
+        return false;
+    }
+    return true;
+}
+
 QJsonObject ProtocolValidator::makeHeartbeatPing(const QString &vehicleId,
                                                  quint32 seq,
                                                  qint64 timestamp)
@@ -432,4 +468,20 @@ QJsonObject ProtocolValidator::makeHeartbeatPing(const QString &vehicleId,
             {QStringLiteral("seq"), static_cast<qint64>(seq)},
             {QStringLiteral("timestamp"), timestamp},
             {QStringLiteral("data"), QJsonObject{}}};
+}
+
+QJsonObject ProtocolValidator::makeSetModeCommand(const QString &vehicleId,
+                                                  quint32 seq,
+                                                  qint64 timestamp,
+                                                  const QString &requestId,
+                                                  const QString &mode)
+{
+    return {{QStringLiteral("version"), 1},
+            {QStringLiteral("type"), QStringLiteral("command")},
+            {QStringLiteral("name"), QStringLiteral("set_mode")},
+            {QStringLiteral("vehicle_id"), vehicleId},
+            {QStringLiteral("seq"), static_cast<qint64>(seq)},
+            {QStringLiteral("request_id"), requestId},
+            {QStringLiteral("timestamp"), timestamp},
+            {QStringLiteral("data"), QJsonObject{{QStringLiteral("mode"), mode}}}};
 }

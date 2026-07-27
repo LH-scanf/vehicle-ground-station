@@ -19,15 +19,19 @@ namespace {
 QJsonObject serverEnvelope(const QString &type,
                            const QString &name,
                            quint32 seq,
-                           const QJsonObject &data)
+                           const QJsonObject &data,
+                           const QString &requestId = {})
 {
-    return {{QStringLiteral("version"), 1},
-            {QStringLiteral("type"), type},
-            {QStringLiteral("name"), name},
-            {QStringLiteral("vehicle_id"), QStringLiteral("car_01")},
-            {QStringLiteral("seq"), static_cast<qint64>(seq)},
-            {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()},
-            {QStringLiteral("data"), data}};
+    QJsonObject result = {{QStringLiteral("version"), 1},
+                          {QStringLiteral("type"), type},
+                          {QStringLiteral("name"), name},
+                          {QStringLiteral("vehicle_id"), QStringLiteral("car_01")},
+                          {QStringLiteral("seq"), static_cast<qint64>(seq)},
+                          {QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch()},
+                          {QStringLiteral("data"), data}};
+    if (!requestId.isEmpty())
+        result.insert(QStringLiteral("request_id"), requestId);
+    return result;
 }
 
 void sendObject(QWebSocket *socket, const QJsonObject &object)
@@ -52,6 +56,7 @@ void WebSocketClientTest::receivesReadyHeartbeatAndTelemetry()
 
     QScopedPointer<QWebSocket> peer;
     quint32 serverSequence = 1;
+    bool acknowledgeModeCommands = true;
     connect(&server, &QWebSocketServer::newConnection, this, [&] {
         peer.reset(server.nextPendingConnection());
         QVERIFY(peer);
@@ -65,21 +70,44 @@ void WebSocketClientTest::receivesReadyHeartbeatAndTelemetry()
                         {QStringLiteral("gateway_instance_id"), QStringLiteral("gw_test")},
                         {QStringLiteral("protocol_version"), 1},
                         {QStringLiteral("auto_disconnect_policy"), QStringLiteral("cancel_task_and_stop")},
-                        {QStringLiteral("capabilities"), QJsonArray{}}}));
+                        {QStringLiteral("capabilities"), QJsonArray{QStringLiteral("set_mode")}}}));
 
         connect(peer.data(), &QWebSocket::textMessageReceived, this, [&](const QString &text) {
             const QJsonObject ping = QJsonDocument::fromJson(text.toUtf8()).object();
-            if (ping.value(QStringLiteral("type")).toString() != QStringLiteral("heartbeat")
-                || ping.value(QStringLiteral("name")).toString() != QStringLiteral("ping")) {
+            if (ping.value(QStringLiteral("type")).toString() == QStringLiteral("heartbeat")
+                && ping.value(QStringLiteral("name")).toString() == QStringLiteral("ping")) {
+                sendObject(peer.data(),
+                           serverEnvelope(
+                               QStringLiteral("heartbeat"),
+                               QStringLiteral("pong"),
+                               serverSequence++,
+                               {{QStringLiteral("ping_seq"), ping.value(QStringLiteral("seq"))},
+                                {QStringLiteral("ping_timestamp"),
+                                 ping.value(QStringLiteral("timestamp"))}}));
                 return;
             }
-            sendObject(peer.data(),
-                       serverEnvelope(
-                           QStringLiteral("heartbeat"),
-                           QStringLiteral("pong"),
-                           serverSequence++,
-                           {{QStringLiteral("ping_seq"), ping.value(QStringLiteral("seq"))},
-                            {QStringLiteral("ping_timestamp"), ping.value(QStringLiteral("timestamp"))}}));
+            if (ping.value(QStringLiteral("type")).toString() == QStringLiteral("command")
+                && ping.value(QStringLiteral("name")).toString() == QStringLiteral("set_mode")) {
+                if (!acknowledgeModeCommands)
+                    return;
+                const QString requestId = ping.value(QStringLiteral("request_id")).toString();
+                sendObject(peer.data(),
+                           serverEnvelope(QStringLiteral("ack"),
+                                          QStringLiteral("set_mode"),
+                                          serverSequence++,
+                                          {{QStringLiteral("stage"), QStringLiteral("accepted")},
+                                           {QStringLiteral("code"), QStringLiteral("ok")},
+                                           {QStringLiteral("message"), QStringLiteral("命令已接收")}},
+                                          requestId));
+                sendObject(peer.data(),
+                           serverEnvelope(QStringLiteral("ack"),
+                                          QStringLiteral("set_mode"),
+                                          serverSequence++,
+                                          {{QStringLiteral("stage"), QStringLiteral("completed")},
+                                           {QStringLiteral("code"), QStringLiteral("ok")},
+                                           {QStringLiteral("message"), QStringLiteral("模式已切换")}},
+                                          requestId));
+            }
         });
 
         sendObject(peer.data(),
@@ -126,9 +154,29 @@ void WebSocketClientTest::receivesReadyHeartbeatAndTelemetry()
     QVERIFY(qAbs(vehicleState.headingDegrees() - 29.7938) < 0.001);
     QVERIFY(vehicleState.rcLink());
     QVERIFY(vehicleState.lastUpdateTimestamp() > 0);
+    QVERIFY(client.modeCommandAvailable());
+
+    client.requestModeChange(QStringLiteral("ground"));
+    QTRY_VERIFY_WITH_TIMEOUT(!client.modeCommandPending(), 2000);
+    QCOMPARE(client.modeCommandStage(), QStringLiteral("completed"));
+    QCOMPARE(client.requestedMode(), QStringLiteral("ground"));
+    // A completed ack never directly overwrites authoritative telemetry state.
+    QCOMPARE(vehicleState.mode(), QStringLiteral("auto"));
+
+    acknowledgeModeCommands = false;
+    client.requestModeChange(QStringLiteral("ground"));
+    QVERIFY(client.modeCommandPending());
+    QVERIFY(QMetaObject::invokeMethod(&client, "handleModeCommandTimeout", Qt::DirectConnection));
+    QVERIFY(!client.modeCommandPending());
+    QCOMPARE(client.modeCommandStage(), QStringLiteral("timed_out"));
+
+    client.requestModeChange(QStringLiteral("ground"));
+    QVERIFY(client.modeCommandPending());
 
     client.disconnectFromGateway();
     QTRY_VERIFY_WITH_TIMEOUT(!client.socketConnected(), 2000);
+    QVERIFY(!client.modeCommandPending());
+    QCOMPARE(client.modeCommandStage(), QStringLiteral("unknown"));
 }
 
 QTEST_GUILESS_MAIN(WebSocketClientTest)

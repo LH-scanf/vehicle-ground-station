@@ -333,6 +333,16 @@ Windows 应用不直接依赖 ROS2。ROS2 Topic、Service 和 Action 与本协�
 
 `mode`只允许 `rc`、`auto`、`ground`。最终成功必须以车辆实际模式已经改变为条件。
 
+`set_mode`执行规则：
+
+- 网关完成结构、枚举和重复请求检查后返回`accepted`；该应答只表示进入执行队列。
+- 网关把模式请求交给ROS控制层，并等待`/control/mode`的实际反馈。
+- 只有实际反馈等于请求模式时才返回`completed`。
+- 默认执行超时为2秒；超时返回`failed`，`code`为`mode_change_timeout`。
+- 网关按接收顺序串行执行模式切换，不为每条命令创建独立线程。
+- 地面站本地等待最终结果的时间为3秒，用于覆盖网关2秒执行窗口和局域网传输余量。
+- 地面站收到`completed`后仍以新的`vehicle_status.mode`作为界面权威状态，不直接改写本地模式。
+
 ### 7.4 `set_estop`和`clear_estop`
 
 ```json
@@ -504,6 +514,7 @@ WebSocket发送成功不代表车辆已接收，`accepted`也不代表车辆已�
 - 地面站超时是本地状态，不得伪造车辆端 `failed` 应答。
 - 收到未知 `request_id` 的应答时，应记录诊断日志但不得改变其他命令状态。
 - 对完全相同的重复请求，车辆端应返回缓存的原始最新阶段和原始`code`，不得再次执行命令。
+- `set_mode`使用相同`request_id`但携带不同内容时返回`rejected`，`code`为`duplicate_request`。
 - 同一 `request_id`携带不同命令或数据时，返回`rejected`和`duplicate_request`。
 
 建议使用的 `code`：
